@@ -1,0 +1,31 @@
+services:
+  mcp-ms365:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-ms365
+    restart: unless-stopped
+    volumes:
+      - ms365-data:/data
+    environment:
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - PORT=${PORT:-3000}
+      - MS365_CLIENT_ID=${MS365_CLIENT_ID}
+      - MS365_TENANT_ID=${MS365_TENANT_ID}
+      - DATA_DIR=/data
+      - TZ=${TZ:-Europe/Amsterdam}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - network-shared
+
+volumes:
+  ms365-data:
+
+networks:
+  network-shared:
+    external: true
