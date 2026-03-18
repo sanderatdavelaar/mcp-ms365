@@ -94,8 +94,8 @@ async function graphRequest<T>(
       );
     }
 
-    // 204 No Content — return early (e.g. DELETE)
-    if (response.status === 204) {
+    // 202 Accepted / 204 No Content — no body to parse
+    if (response.status === 202 || response.status === 204) {
       return undefined as T;
     }
 
