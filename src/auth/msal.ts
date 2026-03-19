@@ -8,7 +8,14 @@ import { join } from "node:path";
 import { config } from "../shared/config.js";
 import type { AuthStatus } from "../shared/types.js";
 
-const SCOPES = ["Mail.Read", "Mail.ReadWrite", "Mail.Send", "Calendars.Read", "Calendars.ReadWrite", "User.Read"];
+const SCOPES = [
+  "Mail.Read", "Mail.ReadWrite", "Mail.Send",
+  "Calendars.Read", "Calendars.ReadWrite",
+  "Chat.Read", "Chat.ReadWrite",
+  "ChannelMessage.Read.All", "ChannelMessage.Send",
+  "Team.ReadBasic.All", "Channel.ReadBasic.All",
+  "User.Read",
+];
 
 let pca: PublicClientApplication;
 let currentAccount: AccountInfo | null = null;

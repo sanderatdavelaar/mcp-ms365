@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAuthTools } from "./tools/auth.js";
 import { registerMailTools } from "./tools/mail.js";
 import { registerCalendarTools } from "./tools/calendar.js";
+import { registerTeamsTools } from "./tools/teams.js";
 
 export function createMs365Server(): McpServer {
   const server = new McpServer({
@@ -11,5 +12,6 @@ export function createMs365Server(): McpServer {
   registerAuthTools(server);
   registerMailTools(server);
   registerCalendarTools(server);
+  registerTeamsTools(server);
   return server;
 }
