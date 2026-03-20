@@ -112,7 +112,7 @@ export function registerTeamsTools(server: McpServer): void {
       try {
         const effectiveLimit = Math.min(params.limit, 50);
         const resp = await graphGet<GraphPagedResponse<GraphChat>>(
-          `/me/chats?$expand=members&$orderby=lastUpdatedDateTime desc&$top=${effectiveLimit}`,
+          `/me/chats?$expand=members&$top=${effectiveLimit}`,
         );
 
         const chats = resp.value.map((c) => ({
