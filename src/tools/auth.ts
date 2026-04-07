@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { getAuthStatus, startDeviceCodeFlow, getAccessToken } from "../auth/msal.js";
+import { getAuthStatus, startDeviceCodeFlow } from "../auth/msal.js";
 
 export function registerAuthTools(server: McpServer): void {
   server.tool(
@@ -12,40 +12,6 @@ export function registerAuthTools(server: McpServer): void {
         const status = getAuthStatus();
         return {
           content: [{ type: "text" as const, text: JSON.stringify(status, null, 2) }],
-        };
-      } catch (error) {
-        return {
-          content: [{ type: "text" as const, text: `Error: ${error}` }],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  server.tool(
-    "ms365_get_access_token",
-    "Return the current Microsoft Graph access token (and expiry) for use by trusted internal services such as the agent-v4 Graph subscription manager. Sensitive — do not expose to end users.",
-    {},
-    { readOnlyHint: true },
-    async () => {
-      try {
-        const token = await getAccessToken();
-        const status = getAuthStatus();
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  access_token: token,
-                  user_email: status.userEmail,
-                  token_expires: status.tokenExpires,
-                },
-                null,
-                2
-              ),
-            },
-          ],
         };
       } catch (error) {
         return {
