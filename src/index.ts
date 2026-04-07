@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createMs365Server } from "./server.js";
 import { createAuthMiddleware } from "./shared/auth-middleware.js";
 import { config, validateConfig } from "./shared/config.js";
-import { initMsal } from "./auth/msal.js";
+import { initMsal, getAccessToken, getAuthStatus } from "./auth/msal.js";
 
 async function main() {
   // Validate required env vars
@@ -23,6 +23,23 @@ async function main() {
   });
 
   const authMiddleware = createAuthMiddleware(config.authToken);
+
+  // Internal token endpoint for trusted services (e.g. agent-v4 Graph
+  // subscription manager). Bearer-protected, returns the current Graph
+  // access token. Not exposed via MCP to keep tokens out of LLM context.
+  app.get("/internal/token", authMiddleware, async (_req: Request, res: Response) => {
+    try {
+      const token = await getAccessToken();
+      const status = getAuthStatus();
+      res.json({
+        access_token: token,
+        user_email: status.userEmail,
+        token_expires: status.tokenExpires,
+      });
+    } catch (error) {
+      res.status(401).json({ error: String(error) });
+    }
+  });
 
   // MCP endpoint with Streamable HTTP transport
   app.post("/mcp", authMiddleware, async (req: Request, res: Response) => {
