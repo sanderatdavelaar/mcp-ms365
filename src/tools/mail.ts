@@ -155,6 +155,7 @@ export function registerMailTools(server: McpServer): void {
       unread_only: z.boolean().default(false).describe("Only return unread emails"),
       limit: z.number().default(20).describe("Max results (max 50)"),
       has_attachments: z.boolean().optional().describe("Filter on attachments"),
+      conversation_id: z.string().optional().describe("Filter op Graph conversationId (thread-key)"),
     },
     { readOnlyHint: true },
     async (params) => {
@@ -188,6 +189,8 @@ export function registerMailTools(server: McpServer): void {
             filterClauses.push(`hasAttachments eq ${params.has_attachments}`);
           if (params.from)
             filterClauses.push(`from/emailAddress/address eq '${params.from.replace(/'/g, "''")}'`);
+          if (params.conversation_id)
+            filterClauses.push(`conversationId eq '${params.conversation_id.replace(/'/g, "''")}'`);
 
           if (filterClauses.length > 0) {
             queryParams.push(`$filter=${filterClauses.join(" and ")}`);
