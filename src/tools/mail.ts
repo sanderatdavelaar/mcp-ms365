@@ -168,7 +168,7 @@ export function registerMailTools(server: McpServer): void {
 
         const queryParams: string[] = [];
         queryParams.push(
-          "$select=id,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments,importance",
+          "$select=id,internetMessageId,conversationId,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments,importance",
         );
         queryParams.push(`$top=${effectiveLimit}`);
 
@@ -204,6 +204,8 @@ export function registerMailTools(server: McpServer): void {
 
         const messages = resp.value.map((m) => ({
           id: m.id,
+          internet_message_id: (m as any).internetMessageId,
+          conversation_id: (m as any).conversationId,
           subject: m.subject,
           from: m.from?.emailAddress?.address,
           to: m.toRecipients?.map((r) => r.emailAddress.address),
