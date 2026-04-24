@@ -231,6 +231,85 @@ export function registerMailTools(server: McpServer): void {
     },
   );
 
+  // Tool 2b: ms365_search_unanswered_mail
+  server.tool(
+    "ms365_search_unanswered_mail",
+    "Return unread Inbox mails for which NO reply has been sent yet in the same conversation. Safer heartbeat signal than ms365_search_mail(unread_only=true): cross-checks Sent Items via conversationId. Fetches unread Inbox mails + recent Sent Items, filters out any with a later-sent reply. Use days=3-7 for heartbeat triage.",
+    {
+      days: z.number().default(3).describe("Look-back window for Inbox and Sent Items"),
+      limit: z.number().default(20).describe("Max results (max 50)"),
+    },
+    { readOnlyHint: true },
+    async (params) => {
+      try {
+        const effectiveLimit = Math.min(params.limit, 50);
+        const daysAgo = new Date();
+        daysAgo.setDate(daysAgo.getDate() - params.days);
+        const isoDate = daysAgo.toISOString();
+
+        // Fetch unread Inbox mails
+        const inboxEndpoint =
+          `/me/mailFolders/Inbox/messages` +
+          `?$filter=isRead eq false and receivedDateTime ge ${isoDate}` +
+          `&$select=id,subject,from,receivedDateTime,bodyPreview,conversationId` +
+          `&$top=50&$orderby=receivedDateTime desc`;
+        const inboxResp = await graphGet<GraphPagedResponse<GraphMessage>>(inboxEndpoint);
+
+        // Fetch recent Sent Items (conversationId + sentDateTime only)
+        const sentEndpoint =
+          `/me/mailFolders/SentItems/messages` +
+          `?$filter=sentDateTime ge ${isoDate}` +
+          `&$select=conversationId,sentDateTime` +
+          `&$top=100&$orderby=sentDateTime desc`;
+        const sentResp = await graphGet<
+          GraphPagedResponse<{ conversationId?: string; sentDateTime: string }>
+        >(sentEndpoint);
+
+        // Build latest-reply-per-conversation map
+        const latestSent = new Map<string, string>();
+        for (const s of sentResp.value) {
+          if (!s.conversationId) continue;
+          const prev = latestSent.get(s.conversationId);
+          if (!prev || s.sentDateTime > prev) {
+            latestSent.set(s.conversationId, s.sentDateTime);
+          }
+        }
+
+        // Filter: keep inbox mails without a later sent reply
+        const unanswered = inboxResp.value.filter((m) => {
+          const convId = (m as any).conversationId;
+          if (!convId) return true; // missing conversationId: include (can't verify)
+          const sentAt = latestSent.get(convId);
+          if (!sentAt) return true;
+          return sentAt <= m.receivedDateTime;
+        });
+
+        const out = unanswered
+          .sort((a, b) => (a.receivedDateTime < b.receivedDateTime ? 1 : -1))
+          .slice(0, effectiveLimit)
+          .map((m) => ({
+            id: m.id,
+            subject: m.subject,
+            from: m.from?.emailAddress?.address,
+            from_name: m.from?.emailAddress?.name,
+            received: m.receivedDateTime,
+            preview: m.bodyPreview?.substring(0, 200),
+            conversation_id: (m as any).conversationId,
+            folder: "Inbox",
+          }));
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(out, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
   // Tool 3: ms365_get_mail
   server.tool(
     "ms365_get_mail",
