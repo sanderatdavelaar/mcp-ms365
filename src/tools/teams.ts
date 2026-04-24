@@ -29,6 +29,16 @@ interface GraphChat {
   chatType: string;
   lastUpdatedDateTime: string;
   members?: Array<{ displayName: string; email?: string }>;
+  lastMessagePreview?: {
+    id: string;
+    createdDateTime: string;
+    messageType: string;
+    from?: {
+      user?: { displayName: string; id: string };
+      application?: { displayName: string };
+    };
+    body?: { content: string; contentType: string };
+  } | null;
 }
 
 interface GraphTeam {
@@ -97,6 +107,17 @@ function formatChatMessage(msg: GraphChatMessage): object {
   };
 }
 
+// --- Cache helpers ---
+
+let meIdCache: string | null = null;
+
+async function getMyUserId(): Promise<string> {
+  if (meIdCache) return meIdCache;
+  const me = await graphGet<{ id: string }>("/me?$select=id");
+  meIdCache = me.id;
+  return meIdCache;
+}
+
 // --- Register all Teams tools ---
 
 export function registerTeamsTools(server: McpServer): void {
@@ -128,6 +149,70 @@ export function registerTeamsTools(server: McpServer): void {
 
         return {
           content: [{ type: "text" as const, text: JSON.stringify(chats, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // Tool 1b: ms365_list_unanswered_chats
+  server.tool(
+    "ms365_list_unanswered_chats",
+    "List Teams chats where the LAST message is NOT from you — i.e. chats where someone else is waiting for a reply. Skips chats whose last activity is older than `days` days, and skips system messages (joined/left/topic-change). Safer heartbeat signal than ms365_list_chats: the raw list also includes chats you already answered.",
+    {
+      limit: z.number().default(20).describe("Max results (max 50)"),
+      days: z.number().default(3).describe("Only include chats with activity within the last N days"),
+    },
+    { readOnlyHint: true },
+    async (params) => {
+      try {
+        const effectiveLimit = Math.min(params.limit, 50);
+        const daysAgo = new Date();
+        daysAgo.setDate(daysAgo.getDate() - params.days);
+        const cutoff = daysAgo.toISOString();
+
+        const myId = await getMyUserId();
+
+        // Fetch a bit more than `limit` because we will filter some out.
+        const resp = await graphGet<GraphPagedResponse<GraphChat>>(
+          `/me/chats?$expand=lastMessagePreview&$top=${effectiveLimit * 2}`,
+        );
+
+        const unanswered = resp.value.filter((c) => {
+          const lm = c.lastMessagePreview;
+          if (!lm) return false;
+          if (lm.createdDateTime < cutoff) return false;
+          if (lm.messageType !== "message") return false;
+          if (lm.from?.user?.id === myId) return false;
+          return true;
+        });
+
+        const out = unanswered.slice(0, effectiveLimit).map((c) => {
+          const lm = c.lastMessagePreview!;
+          const rawBody = lm.body?.content ?? "";
+          const preview =
+            lm.body?.contentType === "html"
+              ? stripHtml(rawBody).substring(0, 200)
+              : rawBody.substring(0, 200);
+          return {
+            chat_id: c.id,
+            chat_topic: c.topic ?? "(geen onderwerp)",
+            chat_type: c.chatType,
+            last_message_at: lm.createdDateTime,
+            last_from_name:
+              lm.from?.user?.displayName ??
+              lm.from?.application?.displayName ??
+              "Unknown",
+            last_message_preview: preview,
+          };
+        });
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(out, null, 2) }],
         };
       } catch (error) {
         return {
