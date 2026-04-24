@@ -22,6 +22,8 @@ interface GraphMessage {
   toRecipients: GraphRecipient[];
   ccRecipients?: GraphRecipient[];
   receivedDateTime: string;
+  conversationId?: string;
+  internetMessageId?: string;
   bodyPreview?: string;
   body?: { contentType: string; content: string };
   isRead: boolean;
@@ -207,8 +209,8 @@ export function registerMailTools(server: McpServer): void {
 
         const messages = resp.value.map((m) => ({
           id: m.id,
-          internet_message_id: (m as any).internetMessageId,
-          conversation_id: (m as any).conversationId,
+          internet_message_id: m.internetMessageId,
+          conversation_id: m.conversationId,
           subject: m.subject,
           from: m.from?.emailAddress?.address,
           to: m.toRecipients?.map((r) => r.emailAddress.address),
@@ -277,9 +279,8 @@ export function registerMailTools(server: McpServer): void {
 
         // Filter: keep inbox mails without a later sent reply
         const unanswered = inboxResp.value.filter((m) => {
-          const convId = (m as any).conversationId;
-          if (!convId) return true; // missing conversationId: include (can't verify)
-          const sentAt = latestSent.get(convId);
+          if (!m.conversationId) return true; // missing conversationId: include (can't verify)
+          const sentAt = latestSent.get(m.conversationId);
           if (!sentAt) return true;
           return sentAt <= m.receivedDateTime;
         });
@@ -294,7 +295,7 @@ export function registerMailTools(server: McpServer): void {
             from_name: m.from?.emailAddress?.name,
             received: m.receivedDateTime,
             preview: m.bodyPreview?.substring(0, 200),
-            conversation_id: (m as any).conversationId,
+            conversation_id: m.conversationId,
             folder: "Inbox",
           }));
 
