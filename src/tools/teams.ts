@@ -178,8 +178,10 @@ export function registerTeamsTools(server: McpServer): void {
         const myId = await getMyUserId();
 
         // Fetch a bit more than `limit` because we will filter some out.
+        // Graph caps $top at 50 on /me/chats — above that it returns 400.
+        const top = Math.min(effectiveLimit * 2, 50);
         const resp = await graphGet<GraphPagedResponse<GraphChat>>(
-          `/me/chats?$expand=lastMessagePreview&$top=${effectiveLimit * 2}`,
+          `/me/chats?$expand=lastMessagePreview&$top=${top}`,
         );
 
         const unanswered = resp.value.filter((c) => {
