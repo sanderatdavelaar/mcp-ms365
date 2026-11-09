@@ -24,6 +24,7 @@ interface GraphMessage {
   receivedDateTime: string;
   conversationId?: string;
   internetMessageId?: string;
+  webLink?: string;
   bodyPreview?: string;
   body?: { contentType: string; content: string };
   isRead: boolean;
@@ -171,7 +172,7 @@ export function registerMailTools(server: McpServer): void {
 
         const queryParams: string[] = [];
         queryParams.push(
-          "$select=id,internetMessageId,conversationId,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments,importance",
+          "$select=id,webLink,internetMessageId,conversationId,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments,importance",
         );
         queryParams.push(`$top=${effectiveLimit}`);
 
@@ -209,6 +210,7 @@ export function registerMailTools(server: McpServer): void {
 
         const messages = resp.value.map((m) => ({
           id: m.id,
+          web_link: m.webLink || null,
           internet_message_id: m.internetMessageId,
           conversation_id: m.conversationId,
           subject: m.subject,
@@ -253,7 +255,7 @@ export function registerMailTools(server: McpServer): void {
         const inboxEndpoint =
           `/me/mailFolders/Inbox/messages` +
           `?$filter=isRead eq false and receivedDateTime ge ${isoDate}` +
-          `&$select=id,subject,from,receivedDateTime,bodyPreview,conversationId` +
+          `&$select=id,webLink,subject,from,receivedDateTime,bodyPreview,conversationId` +
           `&$top=50&$orderby=receivedDateTime desc`;
         const inboxResp = await graphGet<GraphPagedResponse<GraphMessage>>(inboxEndpoint);
 
@@ -296,6 +298,7 @@ export function registerMailTools(server: McpServer): void {
             received: m.receivedDateTime,
             preview: m.bodyPreview?.substring(0, 200),
             conversation_id: m.conversationId,
+            web_link: m.webLink || null,
             folder: "Inbox",
           }));
 
@@ -322,7 +325,7 @@ export function registerMailTools(server: McpServer): void {
     async (params) => {
       try {
         const msg = await graphGet<GraphMessage>(
-          `/me/messages/${params.id}?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,isRead,hasAttachments,importance,categories&$expand=attachments($select=id,name,size,contentType)`,
+          `/me/messages/${params.id}?$select=id,webLink,subject,from,toRecipients,ccRecipients,receivedDateTime,body,isRead,hasAttachments,importance,categories&$expand=attachments($select=id,name,size,contentType)`,
         );
 
         const bodyText =
@@ -350,6 +353,7 @@ export function registerMailTools(server: McpServer): void {
           })),
           importance: msg.importance,
           categories: msg.categories,
+          web_link: msg.webLink || null,
         };
 
         return {
