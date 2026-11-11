@@ -3,9 +3,9 @@ import {
   type AccountInfo,
   type DeviceCodeRequest,
 } from "@azure/msal-node";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { config } from "../shared/config.js";
+import { TokenCacheStore } from "./token-cache.js";
 import type { AuthStatus } from "../shared/types.js";
 
 const SCOPES = [
@@ -20,26 +20,27 @@ const SCOPES = [
 let pca: PublicClientApplication;
 let currentAccount: AccountInfo | null = null;
 
-function getCachePath(): string {
-  return join(config.dataDir, "token-cache.json");
-}
+let cacheStore: TokenCacheStore;
 
-async function loadCache(): Promise<void> {
+async function loadCache(): Promise<boolean> {
+  const { content, needsMigration } = await cacheStore.load();
+  if (content === null) return false;
   try {
-    const cacheContent = await readFile(getCachePath(), "utf-8");
-    pca.getTokenCache().deserialize(cacheContent);
+    pca.getTokenCache().deserialize(content);
   } catch {
-    // Cache file doesn't exist or is corrupted — that's fine on first run
+    // Cache file is corrupted — that's fine, user can log in again
+    return false;
   }
+  return needsMigration;
 }
 
-async function persistCache(): Promise<void> {
+async function persistCache(): Promise<boolean> {
   try {
-    await mkdir(config.dataDir, { recursive: true });
-    const cacheContent = pca.getTokenCache().serialize();
-    await writeFile(getCachePath(), cacheContent, "utf-8");
+    await cacheStore.save(pca.getTokenCache().serialize());
+    return true;
   } catch (error) {
     console.error("Failed to persist token cache:", error);
+    return false;
   }
 }
 
@@ -51,7 +52,14 @@ export async function initMsal(): Promise<void> {
     },
   });
 
-  await loadCache();
+  cacheStore = new TokenCacheStore(join(config.dataDir, "token-cache.json"), config.cacheKey);
+  const needsMigration = await loadCache();
+  if (needsMigration) {
+    // Onversleutelde cache van een eerdere versie: meteen versleuteld terugschrijven.
+    if (await persistCache()) {
+      console.log("Tokencache versleuteld (migratie van onversleutelde cache)");
+    }
+  }
 
   try {
     const accounts = await pca.getTokenCache().getAllAccounts();

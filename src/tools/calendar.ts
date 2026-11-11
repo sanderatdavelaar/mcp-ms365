@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { graphGet, graphPost, graphPatch, graphDelete } from "../auth/graph-client.js";
+import { gid } from "../shared/graph-id.js";
 
 // --- Helper types ---
 
@@ -141,7 +142,7 @@ export function registerCalendarTools(server: McpServer): void {
         const effectiveLimit = Math.min(params.limit, 100);
 
         const basePath = params.calendar_id
-          ? `/me/calendars/${params.calendar_id}/calendarView`
+          ? `/me/calendars/${gid(params.calendar_id)}/calendarView`
           : "/me/calendarView";
 
         const queryParams = [
@@ -182,7 +183,7 @@ export function registerCalendarTools(server: McpServer): void {
     async (params) => {
       try {
         const event = await graphGet<GraphEvent>(
-          `/me/events/${params.id}?$select=${EVENT_FULL_SELECT}`,
+          `/me/events/${gid(params.id)}?$select=${EVENT_FULL_SELECT}`,
           false,
           { Prefer: `outlook.timezone="${TIMEZONE}"` },
         );
@@ -272,7 +273,7 @@ export function registerCalendarTools(server: McpServer): void {
         }
 
         const endpoint = params.calendar_id
-          ? `/me/calendars/${params.calendar_id}/events`
+          ? `/me/calendars/${gid(params.calendar_id)}/events`
           : "/me/events";
 
         const created = await graphPost<GraphEvent>(endpoint, eventBody);
@@ -337,7 +338,7 @@ export function registerCalendarTools(server: McpServer): void {
           }
         }
 
-        const updated = await graphPatch<GraphEvent>(`/me/events/${params.id}`, updates);
+        const updated = await graphPatch<GraphEvent>(`/me/events/${gid(params.id)}`, updates);
 
         const result = {
           id: updated.id,
@@ -369,7 +370,7 @@ export function registerCalendarTools(server: McpServer): void {
     { readOnlyHint: false, destructiveHint: true },
     async (params) => {
       try {
-        await graphDelete(`/me/events/${params.id}`);
+        await graphDelete(`/me/events/${gid(params.id)}`);
 
         return {
           content: [{ type: "text" as const, text: JSON.stringify({ message: "Event deleted" }, null, 2) }],
@@ -399,7 +400,7 @@ export function registerCalendarTools(server: McpServer): void {
         const endDt = toDateTimeParam(params.end);
 
         const basePath = params.calendar_id
-          ? `/me/calendars/${params.calendar_id}/calendarView`
+          ? `/me/calendars/${gid(params.calendar_id)}/calendarView`
           : "/me/calendarView";
 
         const queryParams = [

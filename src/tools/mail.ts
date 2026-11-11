@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { graphGet, graphPost, graphPatch } from "../auth/graph-client.js";
+import { gid } from "../shared/graph-id.js";
 
 // --- Helper types ---
 
@@ -201,7 +202,7 @@ export function registerMailTools(server: McpServer): void {
           queryParams.push("$orderby=receivedDateTime desc");
         }
 
-        const endpoint = `/me/mailFolders/${resolvedFolder}/messages?${queryParams.join("&")}`;
+        const endpoint = `/me/mailFolders/${gid(resolvedFolder)}/messages?${queryParams.join("&")}`;
         const resp = await graphGet<GraphPagedResponse<GraphMessage>>(
           endpoint,
           false,
@@ -325,7 +326,7 @@ export function registerMailTools(server: McpServer): void {
     async (params) => {
       try {
         const msg = await graphGet<GraphMessage>(
-          `/me/messages/${params.id}?$select=id,webLink,subject,from,toRecipients,ccRecipients,receivedDateTime,body,isRead,hasAttachments,importance,categories&$expand=attachments($select=id,name,size,contentType)`,
+          `/me/messages/${gid(params.id)}?$select=id,webLink,subject,from,toRecipients,ccRecipients,receivedDateTime,body,isRead,hasAttachments,importance,categories&$expand=attachments($select=id,name,size,contentType)`,
         );
 
         const bodyText =
@@ -388,7 +389,7 @@ export function registerMailTools(server: McpServer): void {
     async (params) => {
       try {
         if (params.reply_to_id) {
-          await graphPost(`/me/messages/${params.reply_to_id}/reply`, {
+          await graphPost(`/me/messages/${gid(params.reply_to_id)}/reply`, {
             comment: params.body,
           });
         } else {
@@ -445,10 +446,10 @@ export function registerMailTools(server: McpServer): void {
         if (params.reply_to_id) {
           // Create a draft reply, then patch with the desired body/subject
           draft = await graphPost<GraphMessage>(
-            `/me/messages/${params.reply_to_id}/createReply`,
+            `/me/messages/${gid(params.reply_to_id)}/createReply`,
             {},
           );
-          await graphPatch(`/me/messages/${draft.id}`, {
+          await graphPatch(`/me/messages/${gid(draft.id)}`, {
             subject: params.subject,
             body: { contentType: "Text", content: params.body },
             toRecipients: parseRecipients(params.to),
@@ -497,7 +498,7 @@ export function registerMailTools(server: McpServer): void {
     async (params) => {
       try {
         const destinationId = await resolveFolder(params.destination_folder);
-        await graphPost(`/me/messages/${params.id}/move`, {
+        await graphPost(`/me/messages/${gid(params.id)}/move`, {
           destinationId,
         });
 
@@ -528,7 +529,7 @@ export function registerMailTools(server: McpServer): void {
     { readOnlyHint: false },
     async (params) => {
       try {
-        await graphPatch(`/me/messages/${params.id}`, {
+        await graphPatch(`/me/messages/${gid(params.id)}`, {
           isRead: params.is_read,
         });
 

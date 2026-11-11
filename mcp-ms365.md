@@ -2,7 +2,7 @@
 
 ## Context
 
-Ik bouw een persoonlijke AI-agent met meerdere MCP servers. Nu voegen we Microsoft 365 toe — mijn zakelijke omgeving (Pontifexx). We bouwen dit ZELF op de Microsoft Graph API, geen third-party pakketten. Volledige controle over eigen zakelijke data.
+Ik bouw een persoonlijke AI-agent met meerdere MCP servers. Nu voegen we Microsoft 365 toe — mijn zakelijke omgeving. We bouwen dit ZELF op de Microsoft Graph API, geen third-party pakketten. Volledige controle over eigen zakelijke data.
 
 De server volgt hetzelfde patroon als mijn bestaande MCP servers: TypeScript, Streamable HTTP, eigen Docker container op een gedeeld Docker network.
 

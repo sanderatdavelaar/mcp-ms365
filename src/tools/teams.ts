@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { graphGet, graphPost } from "../auth/graph-client.js";
+import { gid } from "../shared/graph-id.js";
 
 // --- Helper types ---
 
@@ -238,7 +239,7 @@ export function registerTeamsTools(server: McpServer): void {
       try {
         const effectiveLimit = Math.min(params.limit, 50);
         const resp = await graphGet<GraphPagedResponse<GraphChatMessage>>(
-          `/me/chats/${params.chatId}/messages?$top=${effectiveLimit}`,
+          `/me/chats/${gid(params.chatId)}/messages?$top=${effectiveLimit}`,
         );
 
         const messages = resp.value.map(formatChatMessage);
@@ -266,7 +267,7 @@ export function registerTeamsTools(server: McpServer): void {
     { readOnlyHint: false, destructiveHint: false },
     async (params) => {
       try {
-        await graphPost(`/me/chats/${params.chatId}/messages`, {
+        await graphPost(`/me/chats/${gid(params.chatId)}/messages`, {
           body: { contentType: "text", content: params.content },
           importance: params.importance,
         });
@@ -324,7 +325,7 @@ export function registerTeamsTools(server: McpServer): void {
     async (params) => {
       try {
         const resp = await graphGet<GraphPagedResponse<GraphChannel>>(
-          `/teams/${params.teamId}/channels`,
+          `/teams/${gid(params.teamId)}/channels`,
         );
 
         const channels = resp.value.map((c) => ({
@@ -360,7 +361,7 @@ export function registerTeamsTools(server: McpServer): void {
       try {
         const effectiveLimit = Math.min(params.limit, 50);
         const resp = await graphGet<GraphPagedResponse<GraphChatMessage>>(
-          `/teams/${params.teamId}/channels/${params.channelId}/messages?$top=${effectiveLimit}`,
+          `/teams/${gid(params.teamId)}/channels/${gid(params.channelId)}/messages?$top=${effectiveLimit}`,
         );
 
         const messages = resp.value.map(formatChatMessage);
@@ -389,7 +390,7 @@ export function registerTeamsTools(server: McpServer): void {
     { readOnlyHint: false, destructiveHint: false },
     async (params) => {
       try {
-        await graphPost(`/teams/${params.teamId}/channels/${params.channelId}/messages`, {
+        await graphPost(`/teams/${gid(params.teamId)}/channels/${gid(params.channelId)}/messages`, {
           body: { contentType: "text", content: params.content },
           importance: params.importance,
         });
@@ -432,8 +433,8 @@ export function registerTeamsTools(server: McpServer): void {
         }
 
         const endpoint = hasChatId
-          ? `/me/chats/${params.chatId}/messages/${params.messageId}/replies`
-          : `/teams/${params.teamId}/channels/${params.channelId}/messages/${params.messageId}/replies`;
+          ? `/me/chats/${gid(params.chatId)}/messages/${gid(params.messageId)}/replies`
+          : `/teams/${gid(params.teamId)}/channels/${gid(params.channelId)}/messages/${gid(params.messageId)}/replies`;
 
         await graphPost(endpoint, {
           body: { contentType: "text", content: params.content },
@@ -478,8 +479,8 @@ export function registerTeamsTools(server: McpServer): void {
 
         const effectiveLimit = Math.min(params.limit, 50);
         const endpoint = hasChatId
-          ? `/me/chats/${params.chatId}/messages/${params.messageId}/replies?$top=${effectiveLimit}`
-          : `/teams/${params.teamId}/channels/${params.channelId}/messages/${params.messageId}/replies?$top=${effectiveLimit}`;
+          ? `/me/chats/${gid(params.chatId)}/messages/${gid(params.messageId)}/replies?$top=${effectiveLimit}`
+          : `/teams/${gid(params.teamId)}/channels/${gid(params.channelId)}/messages/${gid(params.messageId)}/replies?$top=${effectiveLimit}`;
 
         const resp = await graphGet<GraphPagedResponse<GraphChatMessage>>(endpoint);
         const replies = resp.value.map(formatChatMessage);
