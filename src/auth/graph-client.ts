@@ -98,9 +98,10 @@ async function graphRequest<T>(
       continue;
     }
 
-    // Storing aan de kant van Microsoft (bad gateway, niet beschikbaar, time-out): bij lezen gewoon nog eens proberen.
-    if (method === "GET" && [502, 503, 504].includes(response.status) && retries < MAX_RETRIES) {
-      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, retries) * 1000));
+    // Korte storing aan de kant van Microsoft (bad gateway, niet beschikbaar): bij lezen één keer opnieuw proberen.
+    // Een 504 niet: daar heeft Graph al een halve minuut op gewacht, en nog eens wachten laat de aanroeper verlopen.
+    if (method === "GET" && [502, 503].includes(response.status) && retries < 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       retries++;
       continue;
     }
