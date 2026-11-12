@@ -1,6 +1,7 @@
 import { getAccessToken } from "./msal.js";
 
-const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
+const GRAPH_ORIGIN = "https://graph.microsoft.com";
+const GRAPH_BASE = `${GRAPH_ORIGIN}/v1.0`;
 const MAX_RETRIES = 3;
 const MAX_PAGES = 10;
 
@@ -15,6 +16,31 @@ interface GraphPagedResponse<T> {
   value: T[];
   "@odata.nextLink"?: string;
   "@odata.count"?: number;
+}
+
+/**
+ * Graph-fout met de HTTP-status erbij, zodat een aanroeper op bv. een 400 kan
+ * terugvallen op een eenvoudiger variant. De melding is dezelfde als voorheen.
+ */
+export class GraphError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Een `@odata.nextLink` is een volledige URL; die mag alleen naar Graph zelf
+ * wijzen (het token gaat mee). Al het andere is een pad onder /v1.0.
+ */
+function graphUrl(endpoint: string): string {
+  if (endpoint.startsWith(`${GRAPH_ORIGIN}/`)) return endpoint;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(endpoint)) {
+    throw new Error("Ongeldige Graph-URL");
+  }
+  return `${GRAPH_BASE}${endpoint}`;
 }
 
 async function parseErrorBody(response: Response): Promise<GraphErrorBody> {
@@ -52,7 +78,7 @@ async function graphRequest<T>(
     fetchOptions.body = JSON.stringify(body);
   }
 
-  let url = `${GRAPH_BASE}${endpoint}`;
+  const url = graphUrl(endpoint);
   let retries = 0;
 
   // eslint-disable-next-line no-constant-condition
@@ -89,7 +115,8 @@ async function graphRequest<T>(
 
     if (!response.ok) {
       const errorBody = await parseErrorBody(response);
-      throw new Error(
+      throw new GraphError(
+        response.status,
         `Graph API error ${response.status}: ${getErrorMessage(errorBody, response.statusText)}`,
       );
     }
@@ -156,6 +183,62 @@ export async function graphGet<T>(
   headers?: Record<string, string>,
 ): Promise<T> {
   return graphRequest<T>("GET", endpoint, undefined, { allPages, headers });
+}
+
+export type GraphGet = <T>(
+  endpoint: string,
+  allPages?: boolean,
+  headers?: Record<string, string>,
+) => Promise<T>;
+
+export interface GraphPagesOptions<T> {
+  /** Eigen bovengrens voor het aantal pagina's. */
+  maxPages: number;
+  headers?: Record<string, string>;
+  /** Na elke pagina: `false` stopt het bladeren (de rest is niet nodig). */
+  more?: (page: T[]) => boolean;
+  /** Alleen voor tests: vervangt `graphGet`. */
+  get?: GraphGet;
+}
+
+export interface GraphPages<T> {
+  value: T[];
+  pages: number;
+  /** `true` als de bovengrens is geraakt terwijl er nog een volgende pagina was. */
+  truncated: boolean;
+}
+
+/**
+ * Volgt `@odata.nextLink` met een eigen bovengrens en een stopconditie.
+ * Anders dan `allPages` (vaste MAX_PAGES, kapt stil af) gaat elke pagina door
+ * `graphGet` (zelfde afhandeling van 429/401/403) en meldt het resultaat of
+ * er is afgekapt.
+ */
+export async function graphGetPages<T>(
+  endpoint: string,
+  options: GraphPagesOptions<T>,
+): Promise<GraphPages<T>> {
+  const get = options.get ?? graphGet;
+  const value: T[] = [];
+  let next: string | undefined = endpoint;
+  let pages = 0;
+
+  while (next && pages < options.maxPages) {
+    const page: GraphPagedResponse<T> = await get<GraphPagedResponse<T>>(
+      next,
+      false,
+      options.headers,
+    );
+    const items = page.value ?? [];
+    value.push(...items);
+    pages++;
+    next = page["@odata.nextLink"];
+    if (next && options.more && !options.more(items)) {
+      next = undefined;
+    }
+  }
+
+  return { value, pages, truncated: next !== undefined };
 }
 
 export async function graphPost<T>(

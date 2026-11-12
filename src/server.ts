@@ -3,6 +3,7 @@ import { registerAuthTools } from "./tools/auth.js";
 import { registerMailTools } from "./tools/mail.js";
 import { registerCalendarTools } from "./tools/calendar.js";
 import { registerTeamsTools } from "./tools/teams.js";
+import { registerContactDaysTools } from "./tools/contact-days.js";
 
 export function createMs365Server(): McpServer {
   const server = new McpServer({
@@ -13,5 +14,6 @@ export function createMs365Server(): McpServer {
   registerMailTools(server);
   registerCalendarTools(server);
   registerTeamsTools(server);
+  registerContactDaysTools(server);
   return server;
 }
