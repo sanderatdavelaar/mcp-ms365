@@ -44,14 +44,27 @@ interface ChatSummary {
 /** Wie de ander is in een één-op-één-chat verandert niet: één keer ophalen is genoeg. */
 const memberCache = new Map<string, { address: string; name: string } | null>();
 
+async function stap<T>(naam: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    throw new Error(`${naam}: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
 async function mailCounts(self: Set<string>, window: Window, known: Window): Promise<{ counts: DayCounts; note: string }> {
-  const sent = await graphGetPages<MailItem>(
-    `/me/mailFolders/SentItems/messages?$select=sentDateTime,toRecipients,isDraft&$filter=sentDateTime ge ${known.since}&$orderby=sentDateTime desc&$top=${PAGE}`,
-    { maxPages: MAIL_PAGES },
+  // Elke stap krijgt zijn naam mee in de fout: een 504 zonder tekst zegt anders niet welk verzoek het was.
+  const sent = await stap("verzonden", () =>
+    graphGetPages<MailItem>(
+      `/me/mailFolders/SentItems/messages?$select=sentDateTime,toRecipients,isDraft&$filter=sentDateTime ge ${known.since}&$orderby=sentDateTime desc&$top=${PAGE}`,
+      { maxPages: MAIL_PAGES },
+    ),
   );
-  const received = await graphGetPages<MailItem>(
-    `/me/messages?$select=receivedDateTime,from,toRecipients,isDraft&$filter=receivedDateTime ge ${window.since}&$orderby=receivedDateTime desc&$top=${PAGE}`,
-    { maxPages: MAIL_PAGES },
+  const received = await stap("ontvangen", () =>
+    graphGetPages<MailItem>(
+      `/me/messages?$select=receivedDateTime,from,toRecipients,isDraft&$filter=receivedDateTime ge ${window.since}&$orderby=receivedDateTime desc&$top=${PAGE}`,
+      { maxPages: MAIL_PAGES },
+    ),
   );
   const afgekapt = [sent.truncated ? "verzonden" : "", received.truncated ? "ontvangen" : ""].filter(Boolean);
   return {
@@ -63,15 +76,14 @@ async function mailCounts(self: Set<string>, window: Window, known: Window): Pro
 async function teamsCounts(me: Me, self: Set<string>, window: Window): Promise<{ counts: DayCounts; note: string }> {
   const counts = new DayCounts(window, self);
   // Gesorteerd op het laatste bericht: zodra een pagina eindigt met een chat van voor het venster, is de rest ouder.
-  const chats = await graphGetPages<ChatSummary>(
-    `/me/chats?$expand=lastMessagePreview&$orderby=lastMessagePreview/createdDateTime desc&$top=50`,
-    {
+  const chats = await stap("chats", () =>
+    graphGetPages<ChatSummary>(`/me/chats?$expand=lastMessagePreview&$orderby=lastMessagePreview/createdDateTime desc&$top=50`, {
       maxPages: CHAT_PAGES,
       more: (page) => {
         const laatste = page.at(-1)?.lastMessagePreview?.createdDateTime;
         return !laatste || laatste >= window.since;
       },
-    },
+    }),
   );
   let afgekapt = chats.truncated ? 1 : 0;
   for (const chat of chats.value) {
