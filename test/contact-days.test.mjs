@@ -73,13 +73,15 @@ test("teams: alleen echte berichten van een één-op-één-chat, in en uit", () 
 
 test("agenda: kleine afspraken, niet geannuleerd, niet de hele dag, niet afgewezen", () => {
   const ik = adr("test@example.org", "Ik");
-  const ev = (extra) => ({ start: { dateTime: "2026-11-10T14:00:00.0000000" }, organizer: adr("niels@example.com"), attendees: [ik, adr("niels@example.com", "Niels Bezemer")], ...extra });
+  const ev = (extra) => ({ start: { dateTime: "2026-11-10T14:00:00.0000000" }, organizer: adr("niels@example.com"), responseStatus: { response: "accepted" }, attendees: [ik, adr("niels@example.com", "Niels Bezemer")], ...extra });
   const counts = countEvents([
     ev({}),
-    ev({ start: { dateTime: "2026-11-11T09:00:00.0000000" }, organizer: ik, attendees: [ik, adr("niels@example.com", "Niels Bezemer"), { ...adr("weg@example.com"), status: { response: "declined" } }, { ...adr("zaal@example.com"), type: "resource" }] }),
+    ev({ start: { dateTime: "2026-11-11T09:00:00.0000000" }, organizer: ik, responseStatus: { response: "organizer" }, attendees: [ik, adr("niels@example.com", "Niels Bezemer"), { ...adr("weg@example.com"), status: { response: "declined" } }, { ...adr("zaal@example.com"), type: "resource" }] }),
     ev({ isCancelled: true }),
     ev({ isAllDay: true }),
     ev({ responseStatus: { response: "declined" } }),
+    ev({ responseStatus: { response: "notResponded" } }),
+    ev({ responseStatus: { response: "none" } }),
     ev({ attendees: [ik] }),
     ev({ attendees: [ik, ...Array.from({ length: 6 }, (_, i) => adr(`d${i}@example.com`))] }),
   ], SELF, W);

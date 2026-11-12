@@ -210,19 +210,23 @@ export interface EventItem {
 /**
  * Afspraken met een klein gezelschap: elke andere deelnemer krijgt die dag een
  * telling. `uit` als de gebruiker zelf uitnodigde, anders `in`. Geannuleerd,
- * de hele dag, afgewezen (door de gebruiker of door de ander) telt niet.
+ * de hele dag, niet aangenomen door de gebruiker of afgewezen door de ander
+ * telt niet.
  */
 export function countEvents(events: EventItem[], self: Set<string>, window: Window): DayCounts {
   const counts = new DayCounts(window, self);
   for (const e of events) {
     const day = e.start?.dateTime?.slice(0, 10) ?? "";
-    if (e.isCancelled || e.isAllDay || !/^\d{4}-\d{2}-\d{2}$/.test(day) || e.responseStatus?.response === "declined") continue;
+    if (e.isCancelled || e.isAllDay || !/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    const zelf = self.has(normalizeAddress(e.organizer?.emailAddress?.address));
+    // Een uitnodiging waar de gebruiker niet op inging is geen contact: alleen wat hij zelf plande of aannam telt.
+    if (!zelf && !["accepted", "tentativelyAccepted", "organizer"].includes(e.responseStatus?.response ?? "")) continue;
     const anderen = (e.attendees ?? [])
       .filter((a) => a.type !== "resource")
       .map((a) => ({ adres: normalizeAddress(a.emailAddress?.address), naam: a.emailAddress?.name, weg: a.status?.response === "declined" }))
       .filter((a) => a.adres && !self.has(a.adres));
     if (!anderen.length || anderen.length > MAX_OTHER_ATTENDEES) continue;
-    const richting = self.has(normalizeAddress(e.organizer?.emailAddress?.address)) ? "out" : "in";
+    const richting = zelf ? "out" : "in";
     for (const a of anderen) if (!a.weg) counts.add(a.adres, a.naam, day, richting);
   }
   return counts;
