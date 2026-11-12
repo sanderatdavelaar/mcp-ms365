@@ -98,6 +98,13 @@ async function graphRequest<T>(
       continue;
     }
 
+    // Storing aan de kant van Microsoft (bad gateway, niet beschikbaar, time-out): bij lezen gewoon nog eens proberen.
+    if (method === "GET" && [502, 503, 504].includes(response.status) && retries < MAX_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, retries) * 1000));
+      retries++;
+      continue;
+    }
+
     if (response.status === 401) {
       throw new Error("Session expired. Please re-authenticate with ms365_login.");
     }

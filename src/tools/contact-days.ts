@@ -137,18 +137,18 @@ export function registerContactDaysTools(server: McpServer): void {
           ["teams", () => teamsCounts(me, self, window)],
           ["agenda", () => agendaCounts(self, window, now)],
         ];
-        // De kanalen staan los van elkaar: een fout in het ene houdt het andere niet tegen.
-        const parts = await Promise.all(
-          kanalen.map(async ([kanaal, tel]) => {
-            try {
-              const { counts, note } = await tel();
-              return formatChannel(kanaal, window, counts) + (note ? `\n${note}` : "");
-            } catch (error) {
-              // Geen kopregel: Kairos houdt dit kanaal dan op de vorige stand.
-              return `# fout ${kanaal}: ${String(error instanceof Error ? error.message : error).replace(/\s+/g, " ").slice(0, 160)}`;
-            }
-          }),
-        );
+        // De kanalen staan los van elkaar: een fout in het ene houdt het andere niet tegen. Na elkaar, niet tegelijk:
+        // mail en agenda delen één postvak en Graph verdraagt daar weinig verzoeken naast elkaar.
+        const parts: string[] = [];
+        for (const [kanaal, tel] of kanalen) {
+          try {
+            const { counts, note } = await tel();
+            parts.push(formatChannel(kanaal, window, counts) + (note ? `\n${note}` : ""));
+          } catch (error) {
+            // Geen kopregel: Kairos houdt dit kanaal dan op de vorige stand.
+            parts.push(`# fout ${kanaal}: ${String(error instanceof Error ? error.message : error).replace(/\s+/g, " ").slice(0, 160)}`);
+          }
+        }
         return { content: [{ type: "text" as const, text: parts.join("\n") }] };
       } catch (error) {
         return { content: [{ type: "text" as const, text: `Error: ${error}` }], isError: true };
