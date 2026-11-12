@@ -125,9 +125,13 @@ async function agendaCounts(self: Set<string>, window: Window, now: Date): Promi
 export function registerContactDaysTools(server: McpServer): void {
   server.tool(
     "ms365_contact_days",
-    "Per person per day (Europe/Amsterdam): how many work mails, Teams 1:1 messages and small meetings went in and out. Counts only, never content. Mail counts recipients on the To line of sent mail, and received mail only from people you wrote to yourself in the last 60 days. Returns plain text: per channel a header line '# contactdagen <mail|teams|agenda> <from>..<to> regels=<n>' followed by one JSON array per line: [channel, email address, name, date, in, out]. A channel that failed gives '# fout <channel>: …' instead of its header. Pass ALL lines on unchanged to `kairos contactdagen -`.",
+    "Per person per day (Europe/Amsterdam): how many Teams 1:1 messages and small meetings (and, only when asked, work mails) went in and out. Counts only, never content. Mail counts recipients on the To line of sent mail, and received mail only from people you wrote to yourself in the last 60 days. Returns plain text: per channel a header line '# contactdagen <mail|teams|agenda> <from>..<to> regels=<n>' followed by one JSON array per line: [channel, email address, name, date, in, out]. A channel that failed gives '# fout <channel>: …' instead of its header. Pass ALL lines on unchanged to `kairos contactdagen -`.",
     {
       days: z.number().default(CONTACT_DAYS_DEFAULT).describe(`Window in days up to and including today (max ${CONTACT_DAYS_MAX})`),
+      channels: z
+        .array(z.enum(["mail", "teams", "agenda"]))
+        .default(["teams", "agenda"])
+        .describe("Which channels to count. Mail is off by default: on 12 Nov 2026 its query made the mailbox time out (504) for mail and calendar; only pass it for a supervised test."),
     },
     { readOnlyHint: true },
     async (params) => {
@@ -144,11 +148,12 @@ export function registerContactDaysTools(server: McpServer): void {
         );
         if (!self.size) throw new Error("eigen adres onbekend");
 
-        const kanalen: Array<[Channel, () => Promise<{ counts: DayCounts; note: string }>]> = [
+        const alle: Array<[Channel, () => Promise<{ counts: DayCounts; note: string }>]> = [
           ["mail", () => mailCounts(self, window, known)],
           ["teams", () => teamsCounts(me, self, window)],
           ["agenda", () => agendaCounts(self, window, now)],
         ];
+        const kanalen = alle.filter(([kanaal]) => params.channels.includes(kanaal));
         // De kanalen staan los van elkaar: een fout in het ene houdt het andere niet tegen. Na elkaar, niet tegelijk:
         // mail en agenda delen één postvak en Graph verdraagt daar weinig verzoeken naast elkaar.
         const parts: string[] = [];
