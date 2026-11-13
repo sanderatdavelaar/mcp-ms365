@@ -450,11 +450,10 @@ export function registerMailTools(server: McpServer): void {
             `/me/messages/${gid(params.reply_to_id)}/createReply`,
             {},
           );
-          // Het antwoord komt boven het geciteerde bericht dat Graph in het concept zette (alleen als dat HTML is).
-          const quoted = draft.body?.contentType?.toLowerCase() === "html" ? draft.body.content : "";
+          // Het antwoord komt boven het geciteerde bericht dat Graph in het concept zette.
           await graphPatch(`/me/messages/${gid(draft.id)}`, {
             subject: params.subject,
-            body: replyBody(params.body, quoted),
+            body: replyBody(params.body, draft.body?.content, draft.body?.contentType),
             toRecipients: parseRecipients(params.to),
             ccRecipients: params.cc ? parseRecipients(params.cc) : [],
             bccRecipients: params.bcc ? parseRecipients(params.bcc) : [],

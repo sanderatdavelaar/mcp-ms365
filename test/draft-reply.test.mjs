@@ -20,6 +20,13 @@ test("zonder body-tag komt het antwoord vooraan", () => {
   assert.ok(out.content.indexOf("Kort") < out.content.indexOf("origineel"));
 });
 
+test("een origineel in platte tekst blijft onder het antwoord staan", () => {
+  const out = replyBody("Hoi,\n\nPrima.", "\r\n________________________________\r\nVan: Ingrid\r\nIs het klaar?", "Text");
+  assert.equal(out.contentType, "Text");
+  assert.ok(out.content.startsWith("Hoi,\n\nPrima.\n\n"));
+  assert.ok(out.content.includes("Van: Ingrid\r\nIs het klaar?"));
+});
+
 test("zonder citaat blijft het platte tekst, zoals voorheen", () => {
   assert.deepEqual(replyBody("Alleen dit", ""), { contentType: "Text", content: "Alleen dit" });
   assert.deepEqual(replyBody("Alleen dit", undefined), { contentType: "Text", content: "Alleen dit" });

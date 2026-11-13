@@ -2,8 +2,9 @@
 // concept zette. Zonder citaat blijft het platte tekst.
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export function replyBody(text: string, quotedHtml?: string): { contentType: "HTML" | "Text"; content: string } {
+export function replyBody(text: string, quotedHtml?: string, quotedType = "HTML"): { contentType: "HTML" | "Text"; content: string } {
   if (!quotedHtml || !quotedHtml.trim()) return { contentType: "Text", content: text };
+  if (quotedType.toLowerCase() !== "html") return { contentType: "Text", content: `${text}\n\n${quotedHtml}` };
   const reply = `<div>${esc(text).replace(/\r?\n/g, "<br>")}</div><br>`;
   const body = /<body[^>]*>/i.exec(quotedHtml);
   if (!body) return { contentType: "HTML", content: reply + quotedHtml };
