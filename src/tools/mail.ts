@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { graphGet, graphPost, graphPatch } from "../auth/graph-client.js";
 import { gid } from "../shared/graph-id.js";
+import { replyBody } from "./reply-body.js";
 
 // --- Helper types ---
 
@@ -383,7 +384,7 @@ export function registerMailTools(server: McpServer): void {
         .enum(["low", "normal", "high"])
         .default("normal")
         .describe("Email importance"),
-      reply_to_id: z.string().optional().describe("Message ID to reply to"),
+      reply_to_id: z.string().optional().describe("Message ID to reply to: the draft becomes a reply in that thread with the original quoted below; the result has web_link to open the draft"),
     },
     { readOnlyHint: false, destructiveHint: false },
     async (params) => {
@@ -436,7 +437,7 @@ export function registerMailTools(server: McpServer): void {
         .enum(["low", "normal", "high"])
         .default("normal")
         .describe("Email importance"),
-      reply_to_id: z.string().optional().describe("Message ID to reply to"),
+      reply_to_id: z.string().optional().describe("Message ID to reply to: the draft becomes a reply in that thread with the original quoted below; the result has web_link to open the draft"),
     },
     { readOnlyHint: false },
     async (params) => {
@@ -449,9 +450,11 @@ export function registerMailTools(server: McpServer): void {
             `/me/messages/${gid(params.reply_to_id)}/createReply`,
             {},
           );
+          // Het antwoord komt boven het geciteerde bericht dat Graph in het concept zette (alleen als dat HTML is).
+          const quoted = draft.body?.contentType?.toLowerCase() === "html" ? draft.body.content : "";
           await graphPatch(`/me/messages/${gid(draft.id)}`, {
             subject: params.subject,
-            body: { contentType: "Text", content: params.body },
+            body: replyBody(params.body, quoted),
             toRecipients: parseRecipients(params.to),
             ccRecipients: params.cc ? parseRecipients(params.cc) : [],
             bccRecipients: params.bcc ? parseRecipients(params.bcc) : [],
@@ -472,6 +475,7 @@ export function registerMailTools(server: McpServer): void {
           id: draft.id,
           subject: params.subject,
           to: params.to,
+          web_link: draft.webLink || null,
           message: "Draft saved in Drafts folder. Review before sending.",
         };
         return {
